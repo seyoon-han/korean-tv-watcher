@@ -1,6 +1,7 @@
 export interface Drama {
   id: number;
   title: string;
+  koreanTitle?: string;
   thumbnail: string;
   episodesCount?: number;
   status?: string;
@@ -88,6 +89,17 @@ export interface ElectronAPI {
     lang: string;
   }) => Promise<{ success: boolean; subtitleUrl?: string; fileName?: string; error?: string }>;
   getCloudSubtitles: (episodeId: number) => Promise<{ subtitles: SubtitleTrack[] }>;
+  loadPersistentData?: () => Promise<{ history: WatchHistory[]; bookmarks: Bookmark[] }>;
+  savePersistentData?: (data: { history: WatchHistory[]; bookmarks: Bookmark[] }) => Promise<{ success: boolean }>;
+  checkForUpdates?: () => Promise<{
+    hasUpdate: boolean;
+    currentVersion: string;
+    latestVersion: string;
+    releaseNotes: string;
+    downloadUrl: string;
+    assetName: string;
+  }>;
+  downloadAndInstallUpdate?: (url: string) => Promise<{ success: boolean; openedBrowser?: boolean; destPath?: string }>;
   isElectron?: boolean;
 }
 

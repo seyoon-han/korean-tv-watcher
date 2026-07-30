@@ -10,6 +10,7 @@ import { Drama, Episode, BookmarkStatus } from './types/tv';
 import { apiService } from './services/api';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useWatchHistory } from './hooks/useWatchHistory';
+import { AutoUpdateModal } from './components/AutoUpdateModal';
 import { Sparkles, TrendingUp, RefreshCw, Star, Flame, Tv } from 'lucide-react';
 
 interface DownloadItem {
@@ -25,6 +26,15 @@ interface DownloadItem {
 
 export function App() {
   const [activeTab, setActiveTab] = useState('all');
+
+  // Auto Update State
+  const [updateInfo, setUpdateInfo] = useState<{
+    currentVersion: string;
+    latestVersion: string;
+    releaseNotes: string;
+    downloadUrl: string;
+    assetName: string;
+  } | null>(null);
 
   // Data states
   const [featured, setFeatured] = useState<Drama[]>([]);
@@ -51,7 +61,7 @@ export function App() {
   // Downloads state
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
 
-  // 1. Initial Data Fetching
+  // 1. Initial Data Fetching & GitHub Auto-Update Check
   useEffect(() => {
     async function loadAllData() {
       setIsLoading(true);
@@ -69,6 +79,15 @@ export function App() {
       setIsLoading(false);
     }
     loadAllData();
+
+    // Check for GitHub Release updates on startup
+    if (window.electronAPI?.checkForUpdates) {
+      window.electronAPI.checkForUpdates().then((res) => {
+        if (res && res.hasUpdate && res.downloadUrl) {
+          setUpdateInfo(res);
+        }
+      });
+    }
   }, []);
 
   // 2. Electron IPC Listener Setup for Downloader
@@ -336,6 +355,14 @@ export function App() {
           }
         }}
       />
+
+      {/* GitHub Release Auto-Update Modal */}
+      {updateInfo && (
+        <AutoUpdateModal
+          updateInfo={updateInfo}
+          onClose={() => setUpdateInfo(null)}
+        />
+      )}
 
     </div>
   );

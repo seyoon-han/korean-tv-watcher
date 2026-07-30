@@ -606,3 +606,139 @@ ipcMain.handle('get-cloud-subtitles', async (event, episodeId) => {
   }
 });
 
+// 9. Persistent User Data Storage Across App Re-installs
+const persistentDir = path.join(app.getPath('home'), '.korean-tv-watcher-data');
+if (!fs.existsSync(persistentDir)) {
+  try { fs.mkdirSync(persistentDir, { recursive: true }); } catch (e) {}
+}
+const persistentFile = path.join(persistentDir, 'user_store.json');
+
+ipcMain.handle('load-persistent-data', async () => {
+  try {
+    if (fs.existsSync(persistentFile)) {
+      const dataStr = fs.readFileSync(persistentFile, 'utf-8');
+      return JSON.parse(dataStr);
+    }
+  } catch (e) {
+    console.error('[PERSISTENT_DATA_LOAD_ERROR]', e.message);
+  }
+  return { history: [], bookmarks: [] };
+});
+
+ipcMain.handle('save-persistent-data', async (event, data) => {
+  try {
+    fs.writeFileSync(persistentFile, JSON.stringify(data, null, 2), 'utf-8');
+    return { success: true };
+  } catch (e) {
+    console.error('[PERSISTENT_DATA_SAVE_ERROR]', e.message);
+    return { success: false, error: e.message };
+  }
+});
+
+// 10. Auto-Updater: GitHub Release Check & Installer Launcher
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8'));
+    const currentVersion = pkg.version || '1.0.0';
+
+    return new Promise((resolve) => {
+      const req = https.get(
+        'https://api.github.com/repos/seyoon-han/korean-tv-watcher/releases/latest',
+        {
+          headers: {
+            'User-Agent': 'Korean-TV-Watcher-App',
+            'Accept': 'application/vnd.github.v3+json'
+          },
+          rejectUnauthorized: false
+        },
+        (res) => {
+          let body = '';
+          res.on('data', (chunk) => (body += chunk));
+          res.on('end', () => {
+            try {
+              if (res.statusCode !== 200) {
+                return resolve({ hasUpdate: false, currentVersion });
+              }
+              const release = JSON.parse(body);
+              const latestTag = (release.tag_name || '').replace(/^v/, '');
+
+              // Simple semver check
+              const hasUpdate = latestTag && latestTag !== currentVersion && latestTag > currentVersion;
+
+              let assetUrl = '';
+              let assetName = '';
+              if (release.assets && Array.isArray(release.assets)) {
+                const isWin = process.platform === 'win32';
+                const asset = release.assets.find((a) =>
+                  isWin ? a.name.endsWith('.exe') : (a.name.endsWith('.dmg') || a.name.endsWith('.zip'))
+                );
+                if (asset) {
+                  assetUrl = asset.browser_download_url;
+                  assetName = asset.name;
+                }
+              }
+
+              resolve({
+                hasUpdate: !!hasUpdate,
+                currentVersion,
+                latestVersion: latestTag || currentVersion,
+                releaseNotes: release.body || '',
+                downloadUrl: assetUrl || release.html_url,
+                assetName
+              });
+            } catch (e) {
+              resolve({ hasUpdate: false, currentVersion });
+            }
+          });
+        }
+      );
+      req.on('error', () => resolve({ hasUpdate: false, currentVersion }));
+      req.end();
+    });
+  } catch (e) {
+    return { hasUpdate: false, currentVersion: '1.0.0' };
+  }
+});
+
+ipcMain.handle('download-and-install-update', async (event, downloadUrl) => {
+  if (!downloadUrl) return { success: false, error: 'No download URL provided' };
+
+  if (!downloadUrl.endsWith('.exe') && !downloadUrl.endsWith('.dmg') && !downloadUrl.endsWith('.zip')) {
+    // If web URL, open in browser
+    shell.openExternal(downloadUrl);
+    return { success: true, openedBrowser: true };
+  }
+
+  const fileName = path.basename(new URL(downloadUrl).pathname);
+  const destPath = path.join(app.getPath('temp'), fileName);
+
+  return new Promise((resolve) => {
+    const file = fs.createWriteStream(destPath);
+    https.get(downloadUrl, { headers: { 'User-Agent': 'Korean-TV-Watcher-App' }, rejectUnauthorized: false }, (response) => {
+      if (response.statusCode === 302 || response.statusCode === 301) {
+        // Follow redirect
+        https.get(response.headers.location, { headers: { 'User-Agent': 'Korean-TV-Watcher-App' }, rejectUnauthorized: false }, (redirectRes) => {
+          redirectRes.pipe(file);
+          file.on('finish', () => {
+            file.close(() => {
+              shell.openPath(destPath);
+              resolve({ success: true, destPath });
+            });
+          });
+        });
+      } else {
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close(() => {
+            shell.openPath(destPath);
+            resolve({ success: true, destPath });
+          });
+        });
+      }
+    }).on('error', (err) => {
+      fs.unlink(destPath, () => {});
+      resolve({ success: false, error: err.message });
+    });
+  });
+});
+

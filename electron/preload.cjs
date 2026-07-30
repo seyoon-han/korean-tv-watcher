@@ -9,5 +9,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateAISubtitle: (data) => ipcRenderer.invoke('generate-ai-subtitle', data),
   uploadCloudSubtitle: (data) => ipcRenderer.invoke('upload-cloud-subtitle', data),
   getCloudSubtitles: (episodeId) => ipcRenderer.invoke('get-cloud-subtitles', episodeId),
+  loadPersistentData: () => ipcRenderer.invoke('load-persistent-data'),
+  savePersistentData: (data) => ipcRenderer.invoke('save-persistent-data', data),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadAndInstallUpdate: (url) => ipcRenderer.invoke('download-and-install-update', url),
   isElectron: true
 });

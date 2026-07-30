@@ -72,7 +72,14 @@ export const DramaDetailModal: React.FC<DramaDetailModalProps> = ({
               <div className="flex-1 flex flex-col justify-between">
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-2">
-                    {drama.title}
+                    {drama.koreanTitle ? (
+                      <>
+                        <span className="text-white">{drama.koreanTitle}</span>
+                        <span className="block sm:inline text-lg font-medium text-slate-400 sm:ml-2 font-normal">({drama.title})</span>
+                      </>
+                    ) : (
+                      drama.title
+                    )}
                   </h2>
 
                   {/* Metadata Chips */}

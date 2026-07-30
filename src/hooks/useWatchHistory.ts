@@ -13,9 +13,40 @@ export function useWatchHistory() {
     }
   });
 
+  // Load from Electron persistent file store on mount (persists across reinstall)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.loadPersistentData) {
+      (window as any).electronAPI.loadPersistentData().then((store: any) => {
+        if (store && Array.isArray(store.history) && store.history.length > 0) {
+          setHistory((prev) => {
+            // Merge persistent store history with local state
+            const map = new Map<string, WatchHistory>();
+            [...prev, ...store.history].forEach((item) => {
+              const key = `${item.dramaId}_${item.episodeId}`;
+              const existing = map.get(key);
+              if (!existing || (item.updatedAt || 0) > (existing.updatedAt || 0)) {
+                map.set(key, item);
+              }
+            });
+            return Array.from(map.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 100);
+          });
+        }
+      });
+    }
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      if (typeof window !== 'undefined' && (window as any).electronAPI?.savePersistentData) {
+        (window as any).electronAPI.loadPersistentData().then((store: any) => {
+          const currentBookmarks = store?.bookmarks || [];
+          (window as any).electronAPI.savePersistentData({
+            history,
+            bookmarks: currentBookmarks
+          });
+        });
+      }
     } catch (e) {
       console.error('Failed to save watch history:', e);
     }

@@ -1,6 +1,36 @@
 import { Drama, Episode, StreamSource, SubtitleTrack } from '../types/tv';
+import localTranslations from '../assets/title_translations.json';
 
 const BASE_URL = '/api';
+
+let titleMap: Record<string, string> = { ...(localTranslations as Record<string, string>) };
+
+// Sync updated title mapping cache from GitHub raw CDN in background
+async function syncRemoteTranslations() {
+  try {
+    const res = await fetch('https://raw.githubusercontent.com/seyoon-han/korean-tv-watcher/main/src/assets/title_translations.json');
+    if (res.ok) {
+      const remoteMap = await res.json();
+      titleMap = { ...titleMap, ...remoteMap };
+    }
+  } catch (e) {
+    // Keep local fallback
+  }
+}
+syncRemoteTranslations();
+
+function resolveDramaTitles(englishTitle: string): { title: string; koreanTitle?: string } {
+  if (!englishTitle) return { title: '' };
+  const cleanTitle = englishTitle.replace(/\s*\(\d{4}\)$/, '').trim();
+  const korean = titleMap[englishTitle] || titleMap[cleanTitle];
+  if (korean && korean !== englishTitle && korean !== cleanTitle) {
+    return {
+      title: englishTitle,
+      koreanTitle: korean
+    };
+  }
+  return { title: englishTitle };
+}
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -15,16 +45,20 @@ export const apiService = {
   async getFeatured(): Promise<Drama[]> {
     try {
       const data = await fetchJson<any[]>(`${BASE_URL}/DramaList/Show`);
-      return data.map(item => ({
-        id: item.id,
-        title: item.title,
-        thumbnail: item.thumbnail,
-        episodesCount: item.episodesCount,
-        score: item.score,
-        status: item.status,
-        country: item.country,
-        description: item.description
-      }));
+      return data.map(item => {
+        const { title, koreanTitle } = resolveDramaTitles(item.title);
+        return {
+          id: item.id,
+          title,
+          koreanTitle,
+          thumbnail: item.thumbnail,
+          episodesCount: item.episodesCount,
+          score: item.score,
+          status: item.status,
+          country: item.country,
+          description: item.description
+        };
+      });
     } catch (err) {
       console.error('[API] getFeatured error:', err);
       return [];
@@ -35,15 +69,19 @@ export const apiService = {
   async getRecentUpdates(): Promise<Drama[]> {
     try {
       const data = await fetchJson<any[]>(`${BASE_URL}/DramaList/LastUpdate?ispc=false`);
-      return data.map(item => ({
-        id: item.id,
-        title: item.title,
-        thumbnail: item.thumbnail,
-        episodesCount: item.episodesCount,
-        score: item.score,
-        status: item.status,
-        country: item.country
-      }));
+      return data.map(item => {
+        const { title, koreanTitle } = resolveDramaTitles(item.title);
+        return {
+          id: item.id,
+          title,
+          koreanTitle,
+          thumbnail: item.thumbnail,
+          episodesCount: item.episodesCount,
+          score: item.score,
+          status: item.status,
+          country: item.country
+        };
+      });
     } catch (err) {
       console.error('[API] getRecentUpdates error:', err);
       return [];
@@ -54,14 +92,18 @@ export const apiService = {
   async getTrending(): Promise<Drama[]> {
     try {
       const data = await fetchJson<any[]>(`${BASE_URL}/DramaList/MostSearch?ispc=false`);
-      return data.map(item => ({
-        id: item.id,
-        title: item.title,
-        thumbnail: item.thumbnail,
-        episodesCount: item.episodesCount,
-        score: item.score,
-        status: item.status
-      }));
+      return data.map(item => {
+        const { title, koreanTitle } = resolveDramaTitles(item.title);
+        return {
+          id: item.id,
+          title,
+          koreanTitle,
+          thumbnail: item.thumbnail,
+          episodesCount: item.episodesCount,
+          score: item.score,
+          status: item.status
+        };
+      });
     } catch (err) {
       console.error('[API] getTrending error:', err);
       return [];
@@ -72,13 +114,17 @@ export const apiService = {
   async getTopRated(): Promise<Drama[]> {
     try {
       const data = await fetchJson<any[]>(`${BASE_URL}/DramaList/TopRating?ispc=false`);
-      return data.map(item => ({
-        id: item.id,
-        title: item.title,
-        thumbnail: item.thumbnail,
-        score: item.score,
-        status: item.status
-      }));
+      return data.map(item => {
+        const { title, koreanTitle } = resolveDramaTitles(item.title);
+        return {
+          id: item.id,
+          title,
+          koreanTitle,
+          thumbnail: item.thumbnail,
+          score: item.score,
+          status: item.status
+        };
+      });
     } catch (err) {
       console.error('[API] getTopRated error:', err);
       return [];
@@ -90,15 +136,19 @@ export const apiService = {
     if (!query.trim()) return [];
     try {
       const data = await fetchJson<any[]>(`${BASE_URL}/DramaList/Search?q=${encodeURIComponent(query.trim())}`);
-      return data.map(item => ({
-        id: item.id,
-        title: item.title,
-        thumbnail: item.thumbnail,
-        episodesCount: item.episodesCount,
-        score: item.score,
-        status: item.status,
-        country: item.country || (query.toLowerCase().includes('korea') ? 'South Korea' : query.toLowerCase().includes('china') ? 'China' : undefined)
-      }));
+      return data.map(item => {
+        const { title, koreanTitle } = resolveDramaTitles(item.title);
+        return {
+          id: item.id,
+          title,
+          koreanTitle,
+          thumbnail: item.thumbnail,
+          episodesCount: item.episodesCount,
+          score: item.score,
+          status: item.status,
+          country: item.country || (query.toLowerCase().includes('korea') ? 'South Korea' : query.toLowerCase().includes('china') ? 'China' : undefined)
+        };
+      });
     } catch (err) {
       console.error('[API] searchDramas error:', err);
       return [];
@@ -133,9 +183,12 @@ export const apiService = {
         title: ep.title || `Episode ${ep.number}`
       })).sort((a: Episode, b: Episode) => a.number - b.number);
 
+      const { title, koreanTitle } = resolveDramaTitles(data.title);
+
       return {
         id: data.id,
-        title: data.title,
+        title,
+        koreanTitle,
         thumbnail: data.thumbnail,
         episodesCount: data.episodesCount || episodes.length,
         score: data.score,

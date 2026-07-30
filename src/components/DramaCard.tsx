@@ -100,8 +100,15 @@ export const DramaCard: React.FC<DramaCardProps> = ({
       </div>
 
       {/* Title */}
-      <h3 className="mt-2.5 text-sm font-semibold text-slate-100 group-hover:text-indigo-400 transition-colors line-clamp-1">
-        {drama.title}
+      <h3 className="mt-2.5 text-sm font-semibold text-slate-100 group-hover:text-indigo-400 transition-colors line-clamp-1" title={drama.koreanTitle ? `${drama.koreanTitle} (${drama.title})` : drama.title}>
+        {drama.koreanTitle ? (
+          <>
+            <span className="text-slate-100 font-bold">{drama.koreanTitle}</span>
+            <span className="text-xs text-slate-400 font-normal ml-1.5">({drama.title})</span>
+          </>
+        ) : (
+          drama.title
+        )}
       </h3>
     </div>
   );
