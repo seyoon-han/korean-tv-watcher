@@ -60,6 +60,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'cdrama', label: 'C-Drama' },
     { id: 'anime', label: 'Anime' },
     { id: 'movies', label: 'Movies' },
+    { id: 'history', label: 'History' },
+    { id: 'aisub', label: 'AI Subtitles' },
   ];
 
   return (

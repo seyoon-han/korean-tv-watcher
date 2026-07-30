@@ -88,14 +88,14 @@ function serveStaticFile(req, res, pathname) {
   });
 }
 
-// 2. API Proxy to kisskh.do
+// 2. API Proxy to kisskh.co
 function handleApiProxy(req, res, pathname, search) {
-  const targetUrl = 'https://kisskh.do' + pathname + search;
+  const targetUrl = 'https://kisskh.co' + pathname + search;
 
   const headers = { ...req.headers };
-  headers['host'] = 'kisskh.do';
-  headers['origin'] = 'https://kisskh.do';
-  headers['referer'] = 'https://kisskh.do/';
+  headers['host'] = 'kisskh.co';
+  headers['origin'] = 'https://kisskh.co';
+  headers['referer'] = 'https://kisskh.co/';
   headers['accept-encoding'] = 'identity';
   headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -158,7 +158,7 @@ function handleVideoProxy(req, res, urlObj) {
             method: 'GET',
             rejectUnauthorized: false,
             headers: {
-              'Referer': 'https://kisskh.do/',
+              'Referer': 'https://kisskh.co/',
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
               'Accept': '*/*',
               'Accept-Encoding': 'identity'
@@ -231,7 +231,7 @@ function handleVideoProxy(req, res, urlObj) {
           method: req.method || 'GET',
           rejectUnauthorized: false,
           headers: {
-            'Referer': 'https://kisskh.do/',
+            'Referer': 'https://kisskh.co/',
             'Range': req.headers['range'] || '',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept': req.headers['accept'] || '*/*',
@@ -331,8 +331,8 @@ function handleSubtitleProxy(req, res, urlObj) {
       rejectUnauthorized: false,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': 'https://kisskh.do/',
-        'Origin': 'https://kisskh.do',
+        'Referer': 'https://kisskh.co/',
+        'Origin': 'https://kisskh.co',
         'Accept': '*/*'
       }
     }, (targetRes) => {
