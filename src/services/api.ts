@@ -176,20 +176,25 @@ export const apiService = {
     }
   },
 
-  // 5.1 Category Specific Fetching
+  // 5.1 Category Specific Fetching (Fetches 60+ items using Kisskh List API)
   async getDramasByCategory(cat: string): Promise<Drama[]> {
     try {
-      let query = '';
-      if (cat === 'kdrama') query = 'Korea';
-      else if (cat === 'cdrama') query = 'China';
-      else if (cat === 'anime') query = 'Anime';
-      else if (cat === 'movies') query = 'Movie';
-      if (!query) return [];
+      let typeNum = 1; // 1: K-Drama, 2: C-Drama, 3: Anime, 4: Movies
+      if (cat === 'kdrama') typeNum = 1;
+      else if (cat === 'cdrama') typeNum = 2;
+      else if (cat === 'anime') typeNum = 3;
+      else if (cat === 'movies') typeNum = 4;
 
-      const results = await fetchJson<any[]>(`${BASE_URL}/DramaList/Search?q=${encodeURIComponent(query)}`);
-      if (!Array.isArray(results)) return [];
+      const [res1, res2] = await Promise.all([
+        fetchJson<any>(`${BASE_URL}/DramaList/List?page=1&pageSize=30&type=${typeNum}`),
+        fetchJson<any>(`${BASE_URL}/DramaList/List?page=2&pageSize=30&type=${typeNum}`),
+      ]);
 
-      return results.map(item => {
+      const items1 = res1 && Array.isArray(res1.data) ? res1.data : Array.isArray(res1) ? res1 : [];
+      const items2 = res2 && Array.isArray(res2.data) ? res2.data : Array.isArray(res2) ? res2 : [];
+      const combined = [...items1, ...items2];
+
+      return combined.map(item => {
         const { title, koreanTitle } = resolveDramaTitles(item.title);
         return {
           id: item.id,
