@@ -49,6 +49,7 @@ export function parseSubtitlesToCues(rawText: string): SubtitleCue[] {
   if (!rawText) return [];
   let text = String(rawText).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  text = text.split('\n').map(decryptSubtitleLine).join('\n');
   text = text.replace(/\{[^}]*\}/g, '');
   const cues: SubtitleCue[] = [];
   const timeRegex = /(?:(\d+):)?(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(?:(\d+):)?(\d{2}):(\d{2})[,.](\d{3})/;

@@ -1,7 +1,7 @@
 import { Drama, Episode, StreamSource, SubtitleTrack } from '../types/tv';
 import localTranslations from '../assets/title_translations.json';
 
-const BASE_URL = '/api';
+const BASE_URL = 'https://kisskh.co/api';
 
 let titleMap: Record<string, string> = { ...(localTranslations as Record<string, string>) };
 
@@ -256,14 +256,14 @@ export const apiService = {
 
       const data = await res.json();
       
-      let rawVideoUrl = data.Video || data.video || (data.sources && data.sources[0] && data.sources[0].file) || '';
+      const rawVideoUrl = data.Video || data.video || (data.sources && data.sources[0] && data.sources[0].file) || '';
       
       if (!rawVideoUrl) {
         throw new Error('No video stream URL in response');
       }
 
-      // Convert raw M3U8 stream URL into same-origin video-proxy URL
-      const videoProxyUrl = `/video-proxy?url=${encodeURIComponent(rawVideoUrl)}`;
+      // Direct HLS Video URL (Intercepted by Electron webRequest)
+      const videoProxyUrl = rawVideoUrl;
 
       // Parse Subtitles
       const subtitles: SubtitleTrack[] = [];
@@ -271,9 +271,7 @@ export const apiService = {
         data.subtitles.forEach((sub: any, idx: number) => {
           const rawSubSrc = sub.src || sub.url;
           if (rawSubSrc) {
-            const proxiedSrc = rawSubSrc.startsWith('http')
-              ? `/api/proxy-subtitle?url=${encodeURIComponent(rawSubSrc)}`
-              : rawSubSrc;
+            const proxiedSrc = rawSubSrc; // Intercepted natively by webRequest
 
             subtitles.push({
               id: sub.id || idx,

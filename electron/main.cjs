@@ -408,6 +408,27 @@ function createServer() {
 
 // 5. Electron BrowserWindow Management
 function createWindow() {
+  const { session } = require('electron');
+  
+  // Native WebRequest Interception for Kisskh API (Bypass Cloudflare natively)
+  const filter = {
+    urls: ['*://*.kisskh.co/*', '*://*.kisskh.do/*']
+  };
+
+  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+    details.requestHeaders['Referer'] = 'https://kisskh.co/';
+    details.requestHeaders['Origin'] = 'https://kisskh.co';
+    callback({ requestHeaders: details.requestHeaders });
+  });
+
+  session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    responseHeaders['Access-Control-Allow-Origin'] = ['*'];
+    responseHeaders['Access-Control-Allow-Headers'] = ['*'];
+    responseHeaders['Access-Control-Allow-Methods'] = ['*'];
+    callback({ responseHeaders });
+  });
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 720,
