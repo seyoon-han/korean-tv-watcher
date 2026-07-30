@@ -131,11 +131,32 @@ export const apiService = {
     }
   },
 
-  // 5. Search
+  // 5. Search (Supports both English and Korean search terms)
   async searchDramas(query: string): Promise<Drama[]> {
-    if (!query.trim()) return [];
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    let targetQuery = trimmed;
+
+    // Reverse lookup Korean search queries to English titles
+    const lowerQ = trimmed.toLowerCase();
+    for (const [eng, kor] of Object.entries(titleMap)) {
+      if (kor && kor.toLowerCase().includes(lowerQ)) {
+        targetQuery = eng;
+        break;
+      }
+    }
+
     try {
-      const data = await fetchJson<any[]>(`${BASE_URL}/DramaList/Search?q=${encodeURIComponent(query.trim())}`);
+      let data = await fetchJson<any[]>(`${BASE_URL}/DramaList/Search?q=${encodeURIComponent(targetQuery)}`);
+      if (!Array.isArray(data) || data.length === 0) {
+        if (targetQuery !== trimmed) {
+          data = await fetchJson<any[]>(`${BASE_URL}/DramaList/Search?q=${encodeURIComponent(trimmed)}`);
+        }
+      }
+
+      if (!Array.isArray(data)) return [];
+
       return data.map(item => {
         const { title, koreanTitle } = resolveDramaTitles(item.title);
         return {
@@ -146,7 +167,7 @@ export const apiService = {
           episodesCount: item.episodesCount,
           score: item.score,
           status: item.status,
-          country: item.country || (query.toLowerCase().includes('korea') ? 'South Korea' : query.toLowerCase().includes('china') ? 'China' : undefined)
+          country: item.country || (targetQuery.toLowerCase().includes('korea') ? 'South Korea' : undefined)
         };
       });
     } catch (err) {
@@ -165,7 +186,22 @@ export const apiService = {
       else if (cat === 'movies') query = 'Movie';
       if (!query) return [];
 
-      return await this.searchDramas(query);
+      const results = await fetchJson<any[]>(`${BASE_URL}/DramaList/Search?q=${encodeURIComponent(query)}`);
+      if (!Array.isArray(results)) return [];
+
+      return results.map(item => {
+        const { title, koreanTitle } = resolveDramaTitles(item.title);
+        return {
+          id: item.id,
+          title,
+          koreanTitle,
+          thumbnail: item.thumbnail,
+          episodesCount: item.episodesCount,
+          score: item.score,
+          status: item.status,
+          country: cat === 'kdrama' ? 'South Korea' : cat === 'cdrama' ? 'China' : undefined
+        };
+      });
     } catch (err) {
       console.error('[API] getDramasByCategory error:', err);
       return [];

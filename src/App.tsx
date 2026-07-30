@@ -41,6 +41,8 @@ export function App() {
   const [recentUpdates, setRecentUpdates] = useState<Drama[]>([]);
   const [trending, setTrending] = useState<Drama[]>([]);
   const [topRated, setTopRated] = useState<Drama[]>([]);
+  const [categoryDramas, setCategoryDramas] = useState<Drama[]>([]);
+  const [isCategoryLoading, setIsCategoryLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modals & Active selections
@@ -89,6 +91,21 @@ export function App() {
       });
     }
   }, []);
+
+  // Fetch category specific dramas when activeTab changes
+  useEffect(() => {
+    if (activeTab === 'all') {
+      setCategoryDramas([]);
+      return;
+    }
+    async function loadCategory() {
+      setIsCategoryLoading(true);
+      const results = await apiService.getDramasByCategory(activeTab);
+      setCategoryDramas(results);
+      setIsCategoryLoading(false);
+    }
+    loadCategory();
+  }, [activeTab]);
 
   // 2. Electron IPC Listener Setup for Downloader
   useEffect(() => {
@@ -242,50 +259,79 @@ export function App() {
           </section>
         )}
 
-        {/* Recent Updates Grid */}
-        <DramaGrid
-          title="Recent Episode Updates"
-          icon={<RefreshCw className="w-5 h-5 text-purple-400" />}
-          dramas={filterByTab(recentUpdates)}
-          isLoading={isLoading}
-          onSelectDrama={(drama) => setSelectedDramaId(drama.id)}
-          bookmarks={bookmarks}
-          onToggleBookmark={(drama, e) => {
-            e.stopPropagation();
-            toggleBookmark(drama);
-          }}
-          getHistoryForDrama={(id) => history.find((h) => h.dramaId === id)}
-        />
+        {/* Category Tab View */}
+        {activeTab !== 'all' ? (
+          <div className="mt-6">
+            <DramaGrid
+              title={
+                activeTab === 'kdrama'
+                  ? '🇰🇷 한국 드라마 (K-Dramas)'
+                  : activeTab === 'cdrama'
+                  ? '🇨🇳 중국 드라마 (C-Dramas)'
+                  : activeTab === 'anime'
+                  ? '🎎 애니메이션 (Anime)'
+                  : '🎬 영화 (Movies)'
+              }
+              icon={<Sparkles className="w-5 h-5 text-indigo-400" />}
+              dramas={categoryDramas}
+              isLoading={isCategoryLoading}
+              onSelectDrama={(drama) => setSelectedDramaId(drama.id)}
+              bookmarks={bookmarks}
+              onToggleBookmark={(drama, e) => {
+                e.stopPropagation();
+                toggleBookmark(drama);
+              }}
+              getHistoryForDrama={(id) => history.find((h) => h.dramaId === id)}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Recent Updates Grid */}
+            <DramaGrid
+              title="Recent Episode Updates"
+              icon={<RefreshCw className="w-5 h-5 text-purple-400" />}
+              dramas={recentUpdates}
+              isLoading={isLoading}
+              onSelectDrama={(drama) => setSelectedDramaId(drama.id)}
+              bookmarks={bookmarks}
+              onToggleBookmark={(drama, e) => {
+                e.stopPropagation();
+                toggleBookmark(drama);
+              }}
+              getHistoryForDrama={(id) => history.find((h) => h.dramaId === id)}
+            />
 
-        {/* Trending Grid */}
-        <DramaGrid
-          title="Trending & Popular"
-          icon={<Flame className="w-5 h-5 text-rose-400" />}
-          dramas={filterByTab(trending)}
-          isLoading={isLoading}
-          onSelectDrama={(drama) => setSelectedDramaId(drama.id)}
-          bookmarks={bookmarks}
-          onToggleBookmark={(drama, e) => {
-            e.stopPropagation();
-            toggleBookmark(drama);
-          }}
-          getHistoryForDrama={(id) => history.find((h) => h.dramaId === id)}
-        />
+            {/* Trending Grid */}
+            <DramaGrid
+              title="Trending & Popular"
+              icon={<Flame className="w-5 h-5 text-rose-400" />}
+              dramas={trending}
+              isLoading={isLoading}
+              onSelectDrama={(drama) => setSelectedDramaId(drama.id)}
+              bookmarks={bookmarks}
+              onToggleBookmark={(drama, e) => {
+                e.stopPropagation();
+                toggleBookmark(drama);
+              }}
+              getHistoryForDrama={(id) => history.find((h) => h.dramaId === id)}
+            />
 
-        {/* Top Rated Grid */}
-        <DramaGrid
-          title="Top Rated Classics"
-          icon={<Star className="w-5 h-5 text-amber-400" />}
-          dramas={filterByTab(topRated)}
-          isLoading={isLoading}
-          onSelectDrama={(drama) => setSelectedDramaId(drama.id)}
-          bookmarks={bookmarks}
-          onToggleBookmark={(drama, e) => {
-            e.stopPropagation();
-            toggleBookmark(drama);
-          }}
-          getHistoryForDrama={(id) => history.find((h) => h.dramaId === id)}
-        />
+            {/* Top Rated Grid */}
+            <DramaGrid
+              title="Top Rated All-Time"
+              icon={<Star className="w-5 h-5 text-amber-400" />}
+              dramas={topRated}
+              isLoading={isLoading}
+              onSelectDrama={(drama) => setSelectedDramaId(drama.id)}
+              bookmarks={bookmarks}
+              onToggleBookmark={(drama, e) => {
+                e.stopPropagation();
+                toggleBookmark(drama);
+              }}
+              getHistoryForDrama={(id) => history.find((h) => h.dramaId === id)}
+            />
+          </>
+        )}
 
       </main>
 
