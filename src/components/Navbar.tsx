@@ -60,8 +60,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'cdrama', label: 'C-Drama' },
     { id: 'anime', label: 'Anime' },
     { id: 'movies', label: 'Movies' },
-    { id: 'history', label: 'History (시청기록)' },
-    { id: 'aisub', label: '✨ AI 자막' },
   ];
 
   return (
@@ -152,7 +150,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                           className="w-10 h-14 object-cover rounded-lg bg-slate-800"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-semibold text-white truncate">{drama.title}</h4>
+                          <h4 className="text-sm font-semibold text-white truncate">
+                            {drama.koreanTitle ? `${drama.koreanTitle} (${drama.title})` : drama.title}
+                          </h4>
                           <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
                             <span>{drama.episodesCount ? `${drama.episodesCount} Ep` : 'Ongoing'}</span>
                             {drama.score ? (
@@ -169,26 +169,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
           </div>
-
-          {/* History Button */}
-          <button
-            onClick={onOpenLibrary}
-            className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
-            title="Watch History"
-          >
-            <History className="w-4 h-4 text-emerald-400" />
-            <span className="hidden sm:inline text-xs font-semibold">History</span>
-          </button>
-
-          {/* AI Subtitles Button */}
-          <button
-            onClick={() => onTabChange('aisub')}
-            className="p-2.5 rounded-xl bg-gradient-to-r from-indigo-500/20 to-pink-500/20 border border-indigo-500/30 text-indigo-300 hover:text-white hover:border-indigo-400 transition-all flex items-center gap-2"
-            title="AI Subtitles & Live Auto Decryption"
-          >
-            <Sparkles className="w-4 h-4 text-pink-400 animate-pulse" />
-            <span className="hidden sm:inline text-xs font-semibold">AI 자막</span>
-          </button>
 
           {/* Library Button */}
           <button
