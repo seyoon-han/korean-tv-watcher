@@ -17,6 +17,73 @@ interface VideoPlayerModalProps {
   onUpdateProgress: (progressSeconds: number, totalSeconds: number, completed: boolean) => void;
 }
 
+import CryptoJS from 'crypto-js';
+
+const subKey3 = CryptoJS.enc.Utf8.parse('sWODXX04QRTkHdlZ');
+const subCfg3 = JSON.parse(atob('eyJpdiI6eyJ3b3JkcyI6Wzk0Njg5NDY5NiwxNjM0NzQ5MDI5LDExMjc1MDgwODIsMTM5NjI3MTE4M10sInNpZ0J5dGVzIjoxNn19'));
+const subKey2 = CryptoJS.enc.Utf8.parse('AmSmZVcH93UQUezi');
+const subCfg2 = JSON.parse(atob('eyJpdiI6eyJ3b3JkcyI6WzEzODIzNjc4MTksMTQ2NTMzMzg1OSwxOTAyNDA2MjI0LDExNjQ4NTQ4MzhdLCJzaWdCeXRlcyI6MTZ9fQ=='));
+
+function decryptSubtitleLine(line: string): string {
+  const trimmed = line.trim();
+  if (!trimmed || !/^[a-zA-Z0-9\+\/\=]{12,}$/.test(trimmed)) {
+    return line;
+  }
+  try {
+    let dec = CryptoJS.AES.decrypt(trimmed, subKey3, subCfg3).toString(CryptoJS.enc.Utf8);
+    if (dec && dec.length > 0) return dec;
+    dec = CryptoJS.AES.decrypt(trimmed, subKey2, subCfg2).toString(CryptoJS.enc.Utf8);
+    if (dec && dec.length > 0) return dec;
+  } catch (e) {}
+  return line;
+}
+
+export interface SubtitleCue {
+  id: number;
+  start: number;
+  end: number;
+  text: string;
+}
+
+export function parseSubtitlesToCues(rawText: string): SubtitleCue[] {
+  if (!rawText) return [];
+  let text = String(rawText).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  text = text.replace(/\{[^}]*\}/g, '');
+  const cues: SubtitleCue[] = [];
+  const timeRegex = /(?:(\d+):)?(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(?:(\d+):)?(\d{2}):(\d{2})[,.](\d{3})/;
+  const blocks = text.split(/\n\s*\n/);
+  let id = 0;
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    let timeLineIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (timeRegex.test(lines[i])) { timeLineIdx = i; break; }
+    }
+    if (timeLineIdx !== -1) {
+      const match = lines[timeLineIdx].match(timeRegex);
+      if (match) {
+        const startH = parseInt(match[1] || '0', 10);
+        const startM = parseInt(match[2], 10);
+        const startS = parseInt(match[3], 10);
+        const startMs = parseInt(match[4], 10);
+        const startTime = startH * 3600 + startM * 60 + startS + startMs / 1000;
+        const endH = parseInt(match[5] || '0', 10);
+        const endM = parseInt(match[6], 10);
+        const endS = parseInt(match[7], 10);
+        const endMs = parseInt(match[8], 10);
+        const endTime = endH * 3600 + endM * 60 + endS + endMs / 1000;
+        let cueTextLines = lines.slice(timeLineIdx + 1).map(l => decryptSubtitleLine(l));
+        let cueText = cueTextLines.join('\n').trim();
+        if (cueText) {
+          cues.push({ id: ++id, start: startTime, end: endTime, text: cueText });
+        }
+      }
+    }
+  }
+  return cues;
+}
+
 export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   drama,
   currentEpisode,
@@ -52,6 +119,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
   const [selectedSubtitle, setSelectedSubtitle] = useState<string>('off');
   const [subtitleDelay, setSubtitleDelay] = useState<number>(0);
+  const [activeCues, setActiveCues] = useState<SubtitleCue[]>([]);
+  const [currentSubtitleText, setCurrentSubtitleText] = useState<string>('');
 
   // Menus
   const [showQualityMenu, setShowQualityMenu] = useState(false);
@@ -60,7 +129,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Fetch Episode Stream Source
+  // 1. Fetch Episode Stream Source & Auto Select Default Subtitle
   useEffect(() => {
     async function loadStream() {
       setIsLoading(true);
@@ -74,8 +143,16 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       }
 
       setStreamSource(source);
-      setSubtitles(source.subtitles || []);
+      const subList = source.subtitles || [];
+      setSubtitles(subList);
       setIsLoading(false);
+
+      if (subList.length > 0) {
+        const defaultSub = subList.find(s => s.land?.toLowerCase().includes('ko') || s.label?.toLowerCase().includes('korean') || s.default) || subList[0];
+        if (defaultSub) {
+          changeSubtitle(defaultSub.src);
+        }
+      }
     }
     loadStream();
   }, [currentEpisode.id]);
@@ -148,7 +225,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     };
   }, [streamSource]);
 
-  // 3. Time Update & Progress Sync
+  // 3. Time Update & Progress Sync + Custom Subtitle Cue Renderer
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
     const curr = videoRef.current.currentTime;
@@ -158,6 +235,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
     if (dur > 0 && Math.floor(curr) % 5 === 0) {
       onUpdateProgress(curr, dur, curr / dur >= 0.9);
+    }
+
+    // Match active subtitle cue
+    if (activeCues.length > 0) {
+      const matchTime = curr + subtitleDelay;
+      const cue = activeCues.find((c) => matchTime >= c.start && matchTime <= c.end);
+      setCurrentSubtitleText(cue ? cue.text : '');
+    } else {
+      setCurrentSubtitleText('');
     }
   };
 
@@ -189,32 +275,50 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   };
 
   // Subtitle Switcher
-  const changeSubtitle = (subUrl: string) => {
+  const changeSubtitle = async (subUrl: string) => {
     setSelectedSubtitle(subUrl);
+    setShowSubtitleMenu(false);
+
     if (!videoRef.current) return;
 
     // Clear existing text tracks
     const existing = videoRef.current.querySelectorAll('track');
     existing.forEach((t) => t.remove());
 
-    if (subUrl !== 'off') {
-      const track = document.createElement('track');
-      track.kind = 'subtitles';
-      track.label = 'Subtitle';
-      track.srclang = 'en';
-      track.src = subUrl;
-      track.default = true;
-      videoRef.current.appendChild(track);
-
-      setTimeout(() => {
-        if (videoRef.current && videoRef.current.textTracks) {
-          for (let i = 0; i < videoRef.current.textTracks.length; i++) {
-            videoRef.current.textTracks[i].mode = 'showing';
-          }
-        }
-      }, 100);
+    if (subUrl === 'off') {
+      setActiveCues([]);
+      setCurrentSubtitleText('');
+      return;
     }
-    setShowSubtitleMenu(false);
+
+    try {
+      // Fetch subtitle file & parse to cues directly
+      const res = await fetch(subUrl);
+      if (res.ok) {
+        const rawText = await res.text();
+        const cues = parseSubtitlesToCues(rawText);
+        setActiveCues(cues);
+      }
+    } catch (e) {
+      console.error('[SUBTITLE_FETCH_ERROR]', e);
+    }
+
+    // Native track fallback
+    const track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = 'Subtitle';
+    track.srclang = 'en';
+    track.src = subUrl;
+    track.default = true;
+    videoRef.current.appendChild(track);
+
+    setTimeout(() => {
+      if (videoRef.current && videoRef.current.textTracks) {
+        for (let i = 0; i < videoRef.current.textTracks.length; i++) {
+          videoRef.current.textTracks[i].mode = 'showing';
+        }
+      }
+    }, 100);
   };
 
   // Fullscreen
@@ -360,6 +464,13 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           }}
           className="w-full h-full object-contain cursor-pointer"
         />
+
+        {/* Custom Subtitle Overlay */}
+        {currentSubtitleText && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none px-6 py-3 rounded-2xl bg-black/85 backdrop-blur-md border border-white/15 text-white font-bold text-base sm:text-xl text-center shadow-2xl max-w-3xl leading-relaxed animate-in fade-in duration-100 whitespace-pre-line">
+            {currentSubtitleText}
+          </div>
+        )}
 
         {/* Loading Spinner */}
         {isLoading && (

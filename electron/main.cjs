@@ -3,7 +3,31 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const CryptoJS = require('crypto-js');
 const { setupDownloader } = require('./downloader.cjs');
+
+// Kisskh Subtitle AES Decryption Keys and Configuration
+const subKey3 = CryptoJS.enc.Utf8.parse('sWODXX04QRTkHdlZ');
+const subCfg3 = JSON.parse(Buffer.from('eyJpdiI6eyJ3b3JkcyI6Wzk0Njg5NDY5NiwxNjM0NzQ5MDI5LDExMjc1MDgwODIsMTM5NjI3MTE4M10sInNpZ0J5dGVzIjoxNn19', 'base64').toString('utf8'));
+const subKey2 = CryptoJS.enc.Utf8.parse('AmSmZVcH93UQUezi');
+const subCfg2 = JSON.parse(Buffer.from('eyJpdiI6eyJ3b3JkcyI6WzEzODIzNjc4MTksMTQ2NTMzMzg1OSwxOTAyNDA2MjI0LDExNjQ4NTQ4MzhdLCJzaWdCeXRlcyI6MTZ9fQ==', 'base64').toString('utf8'));
+
+function decryptSubtitleText(text) {
+  if (!text) return '';
+  return text.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (!trimmed || !/^[a-zA-Z0-9\+\/\=]{12,}$/.test(trimmed)) {
+      return line;
+    }
+    try {
+      let dec = CryptoJS.AES.decrypt(trimmed, subKey3, subCfg3).toString(CryptoJS.enc.Utf8);
+      if (dec && dec.length > 0) return dec;
+      dec = CryptoJS.AES.decrypt(trimmed, subKey2, subCfg2).toString(CryptoJS.enc.Utf8);
+      if (dec && dec.length > 0) return dec;
+    } catch (e) {}
+    return line;
+  }).join('\n');
+}
 
 let mainWindow = null;
 let localServer = null;
@@ -271,6 +295,9 @@ function convertToWebVTT(rawText) {
   if (text.charCodeAt(0) === 0xFEFF) {
     text = text.slice(1);
   }
+
+  // Decrypt Kisskh AES encrypted subtitle text lines
+  text = decryptSubtitleText(text);
 
   // Remove ASS/SSA formatting tags like {\pos(100,200)} or {\b1}
   text = text.replace(/\{[^}]*\}/g, '');
